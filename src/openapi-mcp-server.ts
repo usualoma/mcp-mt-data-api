@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
 import { OpenAPIV3 } from "openapi-types";
 import axios from "axios";
+import { readFile } from "fs/promises";
 import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
@@ -13,7 +14,7 @@ interface OpenAPIMCPServerConfig {
   name: string;
   version: string;
   apiBaseUrl: string;
-  openApiSpec: OpenAPIV3.Document;
+  openApiSpec: OpenAPIV3.Document | string; // Can be either a Document object or a path/URL
   headers?: Record<string, string>;
 }
 
@@ -30,11 +31,25 @@ export class OpenAPIMCPServer {
     });
 
     this.initializeHandlers();
-    this.parseOpenAPISpec();
   }
 
-  private parseOpenAPISpec(): void {
-    const spec = this.config.openApiSpec;
+  private async loadOpenAPISpec(): Promise<OpenAPIV3.Document> {
+    if (typeof this.config.openApiSpec === 'string') {
+      if (this.config.openApiSpec.startsWith('http')) {
+        // Load from URL
+        const response = await axios.get(this.config.openApiSpec);
+        return response.data as OpenAPIV3.Document;
+      } else {
+        // Load from local file
+        const content = await readFile(this.config.openApiSpec, 'utf-8');
+        return JSON.parse(content) as OpenAPIV3.Document;
+      }
+    }
+    return this.config.openApiSpec as OpenAPIV3.Document;
+  }
+
+  private async parseOpenAPISpec(): Promise<void> {
+    const spec = await this.loadOpenAPISpec();
 
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
@@ -108,6 +123,7 @@ export class OpenAPIMCPServer {
   }
 
   async start(): Promise<void> {
+    await this.parseOpenAPISpec();
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
   }
