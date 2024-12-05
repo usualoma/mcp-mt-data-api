@@ -35,6 +35,35 @@ const server = new OpenAPIMCPServer({
 await server.start();
 ```
 
+### Cat Facts Example
+
+The repository includes an example implementation using the Cat Facts API:
+
+```typescript
+import { OpenAPIMCPServer } from 'openapi-mcp-server';
+
+const server = new OpenAPIMCPServer({
+  name: "cat-facts-mcp",
+  version: "1.0.0",
+  apiBaseUrl: "https://catfact.ninja",
+  openApiSpec: catFactsSpec // OpenAPI specification object
+});
+
+await server.start();
+```
+
+This example demonstrates:
+- Creating an inline OpenAPI specification
+- Initializing an OpenAPIMCPServer
+- Exposing Cat Facts API endpoints as MCP resources
+- Basic error handling
+
+To run the example:
+```bash
+npm run build
+node dist/examples/cat-facts.js
+```
+
 ### Configuration Options
 
 The server accepts the following configuration:
