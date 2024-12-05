@@ -55,7 +55,8 @@ export class OpenAPIMCPServer {
             mimeType: 'application/json'
           };
 
-        this.resources.set(resourceUri, resource);
+          this.resources.set(resourceUri, resource);
+        }
       }
     }
   }
