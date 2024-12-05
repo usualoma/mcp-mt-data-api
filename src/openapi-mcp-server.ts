@@ -1,5 +1,5 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { Resource, ListResourcesRequest, ReadResourceRequest } from "../mcp-specs.js";
+import type { Resource, ListResourcesRequest, ReadResourceRequest } from "./mcp-specs.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OpenAPIV3 } from 'openapi-types';
 import axios from 'axios';
