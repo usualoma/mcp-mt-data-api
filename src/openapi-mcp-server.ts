@@ -1,5 +1,5 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OpenAPIV3 } from "openapi-types";
 import axios from "axios";
 import { readFile } from "fs/promises";
@@ -8,7 +8,7 @@ import {
   ReadResourceRequestSchema,
   Resource,
   TextResourceContents,
-} from "@modelcontextprotocol/sdk/types";
+} from "@modelcontextprotocol/sdk/types.js";
 
 interface OpenAPIMCPServerConfig {
   name: string;
@@ -34,14 +34,14 @@ export class OpenAPIMCPServer {
   }
 
   private async loadOpenAPISpec(): Promise<OpenAPIV3.Document> {
-    if (typeof this.config.openApiSpec === 'string') {
-      if (this.config.openApiSpec.startsWith('http')) {
+    if (typeof this.config.openApiSpec === "string") {
+      if (this.config.openApiSpec.startsWith("http")) {
         // Load from URL
         const response = await axios.get(this.config.openApiSpec);
         return response.data as OpenAPIV3.Document;
       } else {
         // Load from local file
-        const content = await readFile(this.config.openApiSpec, 'utf-8');
+        const content = await readFile(this.config.openApiSpec, "utf-8");
         return JSON.parse(content) as OpenAPIV3.Document;
       }
     }
