@@ -1,10 +1,10 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import type { Resource, ListResourcesRequest, ReadResourceRequest } from "./mcp-specs.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from "@modelcontextprotocol/sdk/server";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
 import { OpenAPIV3 } from 'openapi-types';
 import axios from 'axios';
+import { Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "./mcp-specs";
 
-export interface OpenAPIMCPServerConfig {
+interface OpenAPIMCPServerConfig {
   name: string;
   version: string;
   apiBaseUrl: string;
@@ -19,15 +19,19 @@ export class OpenAPIMCPServer {
 
   constructor(config: OpenAPIMCPServerConfig) {
     this.config = config;
-    this.server = new Server({
-      name: config.name,
-      version: config.version,
-      capabilities: {
-        resources: {
-          listChanged: true
+    this.server = new Server(
+      {
+        name: config.name,
+        version: config.version,
+      },
+      {
+        capabilities: {
+          resources: {
+            listChanged: true
+          }
         }
       }
-    });
+    );
 
     this.initializeHandlers();
     this.parseOpenAPISpec();
@@ -38,36 +42,32 @@ export class OpenAPIMCPServer {
     
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
-      for (const [method, pathItemValue] of Object.entries(pathItem || {})) {
+      for (const [method, operation] of Object.entries(pathItem)) {
         if (method === 'parameters') continue; // Skip common parameters
         
-        // Type guard to ensure we have an operation object
-        if (typeof pathItemValue === 'object' && pathItemValue !== null && 'summary' in pathItemValue) {
-          const operation = pathItemValue as OpenAPIV3.OperationObject;
-          const resourceUri = `openapi://${path}/${method}`;
-          const resource: Resource = {
-            uri: resourceUri,
-            name: operation.summary || `${method.toUpperCase()} ${path}`,
-            description: operation.description || undefined,
-            mimeType: 'application/json'
-          };
+        const resourceUri = `openapi://${path}/${method}`;
+        const resource: Resource = {
+          uri: resourceUri,
+          name: operation.summary || `${method.toUpperCase()} ${path}`,
+          description: operation.description || undefined,
+          mimeType: 'application/json'
+        };
 
-          this.resources.set(resourceUri, resource);
-        }
+        this.resources.set(resourceUri, resource);
       }
     }
   }
 
   private initializeHandlers(): void {
     // Handle resource listing
-    this.server.setRequestHandler<ListResourcesRequest>("resources/list", async () => {
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       return {
         resources: Array.from(this.resources.values())
       };
     });
 
     // Handle resource reading
-    this.server.setRequestHandler<ReadResourceRequest>("resources/read", async (request) => {
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
       const resource = this.resources.get(uri);
       
