@@ -1,8 +1,17 @@
-import { Server } from "@modelcontextprotocol/sdk/server";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
-import { OpenAPIV3 } from 'openapi-types';
-import axios from 'axios';
-import { Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "./mcp-specs";
+import { OpenAPIV3 } from "openapi-types";
+import axios from "axios";
+import {
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+  Resource,
+} from "@modelcontextprotocol/sdk/types";
+//import {
+//  Resource,
+//  ListResourcesRequestSchema,
+//  ReadResourceRequestSchema,
+//} from "./specs/mcp-specs.d.ts";
 
 interface OpenAPIMCPServerConfig {
   name: string;
@@ -27,10 +36,10 @@ export class OpenAPIMCPServer {
       {
         capabilities: {
           resources: {
-            listChanged: true
-          }
-        }
-      }
+            listChanged: true,
+          },
+        },
+      },
     );
 
     this.initializeHandlers();
@@ -39,18 +48,18 @@ export class OpenAPIMCPServer {
 
   private parseOpenAPISpec(): void {
     const spec = this.config.openApiSpec;
-    
+
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
       for (const [method, operation] of Object.entries(pathItem)) {
-        if (method === 'parameters') continue; // Skip common parameters
-        
+        if (method === "parameters") continue; // Skip common parameters
+
         const resourceUri = `openapi://${path}/${method}`;
         const resource: Resource = {
           uri: resourceUri,
           name: operation.summary || `${method.toUpperCase()} ${path}`,
           description: operation.description || undefined,
-          mimeType: 'application/json'
+          mimeType: "application/json",
         };
 
         this.resources.set(resourceUri, resource);
@@ -62,44 +71,49 @@ export class OpenAPIMCPServer {
     // Handle resource listing
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       return {
-        resources: Array.from(this.resources.values())
+        resources: Array.from(this.resources.values()),
       };
     });
 
     // Handle resource reading
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const { uri } = request.params;
-      const resource = this.resources.get(uri);
-      
-      if (!resource) {
-        throw new Error(`Resource not found: ${uri}`);
-      }
+    this.server.setRequestHandler(
+      ReadResourceRequestSchema,
+      async (request) => {
+        const { uri } = request.params;
+        const resource = this.resources.get(uri);
 
-      // Parse the URI to get path and method
-      const [, path, method] = uri.split('openapi://')[1].split('/');
-      
-      try {
-        // Make the actual API call
-        const response = await axios({
-          method,
-          url: `${this.config.apiBaseUrl}${path}`,
-          headers: this.config.headers,
-        });
-
-        return {
-          contents: [{
-            uri,
-            mimeType: 'application/json',
-            text: JSON.stringify(response.data, null, 2)
-          }]
-        };
-      } catch (error) {
-        if (axios.isAxiosError(error)) {
-          throw new Error(`API request failed: ${error.message}`);
+        if (!resource) {
+          throw new Error(`Resource not found: ${uri}`);
         }
-        throw error;
-      }
-    });
+
+        // Parse the URI to get path and method
+        const [, path, method] = uri.split("openapi://")[1].split("/");
+
+        try {
+          // Make the actual API call
+          const response = await axios({
+            method,
+            url: `${this.config.apiBaseUrl}${path}`,
+            headers: this.config.headers,
+          });
+
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: "application/json",
+                text: JSON.stringify(response.data, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          if (axios.isAxiosError(error)) {
+            throw new Error(`API request failed: ${error.message}`);
+          }
+          throw error;
+        }
+      },
+    );
   }
 
   async start(): Promise<void> {
