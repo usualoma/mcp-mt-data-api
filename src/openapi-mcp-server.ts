@@ -1,8 +1,7 @@
-import { Server } from "@modelcontextprotocol/sdk/server";
+import { Server, Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
 import { OpenAPIV3 } from 'openapi-types';
 import axios from 'axios';
-import type { Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk";
 
 export interface OpenAPIMCPServerConfig {
   name: string;
@@ -42,16 +41,19 @@ export class OpenAPIMCPServer {
     
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
-      for (const [method, operation] of Object.entries(pathItem)) {
+      for (const [method, pathItemValue] of Object.entries(pathItem)) {
         if (method === 'parameters') continue; // Skip common parameters
         
-        const resourceUri = `openapi://${path}/${method}`;
-        const resource: Resource = {
-          uri: resourceUri,
-          name: operation.summary || `${method.toUpperCase()} ${path}`,
-          description: operation.description || undefined,
-          mimeType: 'application/json'
-        };
+        // Type guard to ensure we have an operation object
+        if (typeof pathItemValue === 'object' && pathItemValue !== null && 'summary' in pathItemValue) {
+          const operation = pathItemValue as OpenAPIV3.OperationObject;
+          const resourceUri = `openapi://${path}/${method}`;
+          const resource: Resource = {
+            uri: resourceUri,
+            name: operation.summary || `${method.toUpperCase()} ${path}`,
+            description: operation.description || undefined,
+            mimeType: 'application/json'
+          };
 
         this.resources.set(resourceUri, resource);
       }
@@ -67,7 +69,7 @@ export class OpenAPIMCPServer {
     });
 
     // Handle resource reading
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request: { params: { uri: string } }) => {
       const { uri } = request.params;
       const resource = this.resources.get(uri);
       
