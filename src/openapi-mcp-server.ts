@@ -6,12 +6,8 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   Resource,
+  TextResourceContents,
 } from "@modelcontextprotocol/sdk/types";
-//import {
-//  Resource,
-//  ListResourcesRequestSchema,
-//  ReadResourceRequestSchema,
-//} from "./specs/mcp-specs.d.ts";
 
 interface OpenAPIMCPServerConfig {
   name: string;
@@ -28,19 +24,10 @@ export class OpenAPIMCPServer {
 
   constructor(config: OpenAPIMCPServerConfig) {
     this.config = config;
-    this.server = new Server(
-      {
-        name: config.name,
-        version: config.version,
-      },
-      {
-        capabilities: {
-          resources: {
-            listChanged: true,
-          },
-        },
-      },
-    );
+    this.server = new Server({
+      name: config.name,
+      version: config.version,
+    });
 
     this.initializeHandlers();
     this.parseOpenAPISpec();
@@ -51,14 +38,17 @@ export class OpenAPIMCPServer {
 
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
-      for (const [method, operation] of Object.entries(pathItem)) {
-        if (method === "parameters") continue; // Skip common parameters
+      if (!pathItem) continue;
 
+      for (const [method, operation] of Object.entries(pathItem)) {
+        if (method === "parameters" || !operation) continue; // Skip common parameters
+
+        const op = operation as OpenAPIV3.OperationObject;
         const resourceUri = `openapi://${path}/${method}`;
         const resource: Resource = {
           uri: resourceUri,
-          name: operation.summary || `${method.toUpperCase()} ${path}`,
-          description: operation.description || undefined,
+          name: op.summary || `${method.toUpperCase()} ${path}`,
+          description: op.description,
           mimeType: "application/json",
         };
 
@@ -87,7 +77,8 @@ export class OpenAPIMCPServer {
         }
 
         // Parse the URI to get path and method
-        const [, path, method] = uri.split("openapi://")[1].split("/");
+        const [, pathAndMethod] = uri.split("openapi://");
+        const [path, method] = pathAndMethod.split("/");
 
         try {
           // Make the actual API call
@@ -97,14 +88,14 @@ export class OpenAPIMCPServer {
             headers: this.config.headers,
           });
 
+          const contents: TextResourceContents = {
+            uri,
+            mimeType: "application/json",
+            text: JSON.stringify(response.data, null, 2),
+          };
+
           return {
-            contents: [
-              {
-                uri,
-                mimeType: "application/json",
-                text: JSON.stringify(response.data, null, 2),
-              },
-            ],
+            contents: [contents],
           };
         } catch (error) {
           if (axios.isAxiosError(error)) {
