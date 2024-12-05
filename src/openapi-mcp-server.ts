@@ -1,5 +1,5 @@
-import { Server, Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
+import { Server, Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OpenAPIV3 } from 'openapi-types';
 import axios from 'axios';
 
@@ -41,7 +41,7 @@ export class OpenAPIMCPServer {
     
     // Convert each OpenAPI path to an MCP resource
     for (const [path, pathItem] of Object.entries(spec.paths)) {
-      for (const [method, pathItemValue] of Object.entries(pathItem)) {
+      for (const [method, pathItemValue] of Object.entries(pathItem || {})) {
         if (method === 'parameters') continue; // Skip common parameters
         
         // Type guard to ensure we have an operation object
