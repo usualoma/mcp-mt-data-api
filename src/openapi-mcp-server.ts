@@ -1,4 +1,5 @@
-import { Server, Resource, ListResourcesRequestSchema, ReadResourceRequestSchema } from "@modelcontextprotocol/sdk/server/index.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { Resource, ListResourcesRequest, ReadResourceRequest } from "../mcp-specs.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OpenAPIV3 } from 'openapi-types';
 import axios from 'axios';
@@ -18,19 +19,15 @@ export class OpenAPIMCPServer {
 
   constructor(config: OpenAPIMCPServerConfig) {
     this.config = config;
-    this.server = new Server(
-      {
-        name: config.name,
-        version: config.version,
-      },
-      {
-        capabilities: {
-          resources: {
-            listChanged: true
-          }
+    this.server = new Server({
+      name: config.name,
+      version: config.version,
+      capabilities: {
+        resources: {
+          listChanged: true
         }
       }
-    );
+    });
 
     this.initializeHandlers();
     this.parseOpenAPISpec();
@@ -63,14 +60,14 @@ export class OpenAPIMCPServer {
 
   private initializeHandlers(): void {
     // Handle resource listing
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    this.server.setRequestHandler<ListResourcesRequest>("resources/list", async () => {
       return {
         resources: Array.from(this.resources.values())
       };
     });
 
     // Handle resource reading
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request: { params: { uri: string } }) => {
+    this.server.setRequestHandler<ReadResourceRequest>("resources/read", async (request) => {
       const { uri } = request.params;
       const resource = this.resources.get(uri);
       
