@@ -181,16 +181,18 @@ class OpenAPIMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { id, parameters } = request.params;
       
-      if (!id) {
-        throw new Error('Tool ID is required');
+      if (!id || typeof id !== 'string' || id.trim() === '') {
+        console.error('Invalid or missing tool ID in request:', request.params);
+        throw new Error('Valid tool ID is required');
       }
 
-      console.error(`Attempting to execute tool: ${id}`); // Debug logging
-      const tool = this.tools.get(id);
+      const normalizedId = id.trim();
+      console.error(`Attempting to execute tool: ${normalizedId}`); // Debug logging
+      const tool = this.tools.get(normalizedId);
 
       if (!tool) {
         console.error(`Available tools: ${Array.from(this.tools.keys()).join(', ')}`); // Debug logging
-        throw new Error(`Tool not found: ${id}`);
+        throw new Error(`Tool not found: ${normalizedId}`);
       }
 
       try {
