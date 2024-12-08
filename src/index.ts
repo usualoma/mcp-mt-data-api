@@ -182,9 +182,10 @@ class OpenAPIMCPServer {
 
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { id, name, parameters } = request.params;
+      const { id, name, arguments: params } = request.params;
       
       console.error('Received request:', request.params);
+      console.error('Using parameters from arguments:', params);
 
       // Find tool by ID or name
       let tool: Tool | undefined;
@@ -243,23 +244,23 @@ class OpenAPIMCPServer {
         // Handle different parameter types based on HTTP method
         if (method.toLowerCase() === 'get') {
           // For GET requests, ensure parameters are properly structured
-          if (parameters && typeof parameters === 'object') {
+          if (params && typeof params === 'object') {
             // Handle array parameters properly
-            const params: Record<string, string> = {};
-            for (const [key, value] of Object.entries(parameters)) {
+            const queryParams: Record<string, string> = {};
+            for (const [key, value] of Object.entries(params)) {
               if (Array.isArray(value)) {
                 // Join array values with commas for query params
-                params[key] = value.join(',');
+                queryParams[key] = value.join(',');
               } else if (value !== undefined && value !== null) {
                 // Convert other values to strings
-                params[key] = String(value);
+                queryParams[key] = String(value);
               }
             }
-            config.params = params;
+            config.params = queryParams;
           }
         } else {
           // For POST, PUT, PATCH - send as body
-          config.data = parameters;
+          config.data = params;
         }
 
         console.error(`Processed parameters:`, config.params || config.data);
