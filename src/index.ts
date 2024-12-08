@@ -59,18 +59,21 @@ function loadConfig(): OpenAPIMCPServerConfig {
       type: "string",
       description: "Server version",
     })
-    .help()
-    .argv;
+    .help().argv;
 
   // Combine CLI args and env vars, with CLI taking precedence
   const apiBaseUrl = argv["api-base-url"] || process.env.API_BASE_URL;
   const openApiSpec = argv["openapi-spec"] || process.env.OPENAPI_SPEC_PATH;
 
   if (!apiBaseUrl) {
-    throw new Error("API base URL is required (--api-base-url or API_BASE_URL)");
+    throw new Error(
+      "API base URL is required (--api-base-url or API_BASE_URL)",
+    );
   }
   if (!openApiSpec) {
-    throw new Error("OpenAPI spec is required (--openapi-spec or OPENAPI_SPEC_PATH)");
+    throw new Error(
+      "OpenAPI spec is required (--openapi-spec or OPENAPI_SPEC_PATH)",
+    );
   }
 
   const headers = parseHeaders(argv.headers || process.env.API_HEADERS);
@@ -226,4 +229,4 @@ async function main(): Promise<void> {
 
 main();
 
-export { OpenAPIMCPServer, loadConfigFromEnv };
+export { OpenAPIMCPServer, loadConfig };
