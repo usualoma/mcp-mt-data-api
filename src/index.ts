@@ -5,6 +5,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { OpenAPIV3 } from "openapi-types";
 import axios from "axios";
 import { readFile } from "fs/promises";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema, // Changed from ExecuteToolRequestSchema
@@ -19,29 +21,65 @@ interface OpenAPIMCPServerConfig {
   headers?: Record<string, string>;
 }
 
-function loadConfigFromEnv(): OpenAPIMCPServerConfig {
-  if (!process.env.API_BASE_URL) {
-    throw new Error("API_BASE_URL environment variable is required");
-  }
-  if (!process.env.OPENAPI_SPEC_PATH) {
-    throw new Error("OPENAPI_SPEC_PATH environment variable is required");
-  }
-
-  // Parse headers from env if present
-  // Format: "key1:value1,key2:value2"
+function parseHeaders(headerStr?: string): Record<string, string> {
   const headers: Record<string, string> = {};
-  if (process.env.API_HEADERS) {
-    process.env.API_HEADERS.split(",").forEach((header) => {
+  if (headerStr) {
+    headerStr.split(",").forEach((header) => {
       const [key, value] = header.split(":");
       if (key && value) headers[key.trim()] = value.trim();
     });
   }
+  return headers;
+}
+
+function loadConfig(): OpenAPIMCPServerConfig {
+  const argv = yargs(hideBin(process.argv))
+    .option("api-base-url", {
+      alias: "u",
+      type: "string",
+      description: "Base URL for the API",
+    })
+    .option("openapi-spec", {
+      alias: "s",
+      type: "string",
+      description: "Path or URL to OpenAPI specification",
+    })
+    .option("headers", {
+      alias: "H",
+      type: "string",
+      description: "API headers in format 'key1:value1,key2:value2'",
+    })
+    .option("name", {
+      alias: "n",
+      type: "string",
+      description: "Server name",
+    })
+    .option("version", {
+      alias: "v",
+      type: "string",
+      description: "Server version",
+    })
+    .help()
+    .argv;
+
+  // Combine CLI args and env vars, with CLI taking precedence
+  const apiBaseUrl = argv["api-base-url"] || process.env.API_BASE_URL;
+  const openApiSpec = argv["openapi-spec"] || process.env.OPENAPI_SPEC_PATH;
+
+  if (!apiBaseUrl) {
+    throw new Error("API base URL is required (--api-base-url or API_BASE_URL)");
+  }
+  if (!openApiSpec) {
+    throw new Error("OpenAPI spec is required (--openapi-spec or OPENAPI_SPEC_PATH)");
+  }
+
+  const headers = parseHeaders(argv.headers || process.env.API_HEADERS);
 
   return {
-    name: process.env.SERVER_NAME || "mcp-openapi-server",
-    version: process.env.SERVER_VERSION || "1.0.0",
-    apiBaseUrl: process.env.API_BASE_URL,
-    openApiSpec: process.env.OPENAPI_SPEC_PATH,
+    name: argv.name || process.env.SERVER_NAME || "mcp-openapi-server",
+    version: argv.version || process.env.SERVER_VERSION || "1.0.0",
+    apiBaseUrl,
+    openApiSpec,
     headers,
   };
 }
@@ -177,7 +215,7 @@ class OpenAPIMCPServer {
 
 async function main(): Promise<void> {
   try {
-    const config = loadConfigFromEnv();
+    const config = loadConfig();
     const server = new OpenAPIMCPServer(config);
     await server.start();
   } catch (error) {
