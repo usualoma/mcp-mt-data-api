@@ -130,14 +130,15 @@ class OpenAPIMCPServer {
 
         const op = operation as OpenAPIV3.OperationObject;
         // Create a clean tool ID by removing the leading slash and replacing special chars
-        const cleanPath = path.replace(/^\//, '');
+        const cleanPath = path.replace(/^\//, "");
         const toolId = `${method.toUpperCase()}-${cleanPath}`.replace(
           /[^a-zA-Z0-9-]/g,
           "-",
         );
         console.error(`Registering tool: ${toolId}`); // Debug logging
         const tool: Tool = {
-          name: op.operationId || op.summary || `${method.toUpperCase()} ${path}`,
+          name:
+            op.operationId || op.summary || `${method.toUpperCase()} ${path}`,
           description:
             op.description ||
             `Make a ${method.toUpperCase()} request to ${path}`,
@@ -183,9 +184,9 @@ class OpenAPIMCPServer {
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { id, name, arguments: params } = request.params;
-      
-      console.error('Received request:', request.params);
-      console.error('Using parameters from arguments:', params);
+
+      console.error("Received request:", request.params);
+      console.error("Using parameters from arguments:", params);
 
       // Find tool by ID or name
       let tool: Tool | undefined;
@@ -206,7 +207,11 @@ class OpenAPIMCPServer {
       }
 
       if (!tool || !toolId) {
-        console.error(`Available tools: ${Array.from(this.tools.entries()).map(([id, t]) => `${id} (${t.name})`).join(', ')}`);
+        console.error(
+          `Available tools: ${Array.from(this.tools.entries())
+            .map(([id, t]) => `${id} (${t.name})`)
+            .join(", ")}`,
+        );
         throw new Error(`Tool not found: ${id || name}`);
       }
 
@@ -218,21 +223,21 @@ class OpenAPIMCPServer {
         const path = "/" + pathParts.join("/").replace(/-/g, "/");
 
         // Ensure base URL ends with slash for proper joining
-        const baseUrl = this.config.apiBaseUrl.endsWith('/') 
-          ? this.config.apiBaseUrl 
+        const baseUrl = this.config.apiBaseUrl.endsWith("/")
+          ? this.config.apiBaseUrl
           : `${this.config.apiBaseUrl}/`;
-        
+
         // Remove leading slash from path to avoid double slashes
-        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-        
+        const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+
         // Construct the full URL
         const url = new URL(cleanPath, baseUrl).toString();
-        
-        console.error(`Making API request: ${method.toLowerCase()} ${url}`);
-        console.error(`Base URL: ${baseUrl}`);
-        console.error(`Path: ${cleanPath}`);
-        console.error(`Raw parameters:`, params);
-        console.error(`Request headers:`, this.config.headers);
+
+        //console.error(`Making API request: ${method.toLowerCase()} ${url}`);
+        //console.error(`Base URL: ${baseUrl}`);
+        //console.error(`Path: ${cleanPath}`);
+        //console.error(`Raw parameters:`, params);
+        //console.error(`Request headers:`, this.config.headers);
 
         // Prepare request configuration
         const config: any = {
@@ -242,15 +247,15 @@ class OpenAPIMCPServer {
         };
 
         // Handle different parameter types based on HTTP method
-        if (method.toLowerCase() === 'get') {
+        if (method.toLowerCase() === "get") {
           // For GET requests, ensure parameters are properly structured
-          if (params && typeof params === 'object') {
+          if (params && typeof params === "object") {
             // Handle array parameters properly
             const queryParams: Record<string, string> = {};
             for (const [key, value] of Object.entries(params)) {
               if (Array.isArray(value)) {
                 // Join array values with commas for query params
-                queryParams[key] = value.join(',');
+                queryParams[key] = value.join(",");
               } else if (value !== undefined && value !== null) {
                 // Convert other values to strings
                 queryParams[key] = String(value);
@@ -265,25 +270,27 @@ class OpenAPIMCPServer {
 
         console.error(`Processed parameters:`, config.params || config.data);
 
-        console.error('Final request config:', config);
+        console.error("Final request config:", config);
 
         try {
           const response = await axios(config);
-          console.error('Response status:', response.status);
-          console.error('Response headers:', response.headers);
-          console.error('Response data:', response.data);
+          console.error("Response status:", response.status);
+          console.error("Response headers:", response.headers);
+          console.error("Response data:", response.data);
           return {
             result: response.data,
           };
         } catch (error) {
           if (axios.isAxiosError(error)) {
-            console.error('Request failed:', {
+            console.error("Request failed:", {
               status: error.response?.status,
               statusText: error.response?.statusText,
               data: error.response?.data,
               headers: error.response?.headers,
             });
-            throw new Error(`API request failed: ${error.message} - ${JSON.stringify(error.response?.data)}`);
+            throw new Error(
+              `API request failed: ${error.message} - ${JSON.stringify(error.response?.data)}`,
+            );
           }
           throw error;
         }
