@@ -279,6 +279,7 @@ class OpenAPIMCPServer {
           console.error("Response data:", response.data);
           return {
             content: [{
+              type: "text",
               text: JSON.stringify(response.data, null, 2)
             }]
           };
