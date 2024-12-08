@@ -137,7 +137,7 @@ class OpenAPIMCPServer {
         );
         console.error(`Registering tool: ${toolId}`); // Debug logging
         const tool: Tool = {
-          name: op.summary || `${method.toUpperCase()} ${path}`,
+          name: op.operationId || op.summary || `${method.toUpperCase()} ${path}`,
           description:
             op.description ||
             `Make a ${method.toUpperCase()} request to ${path}`,
@@ -147,6 +147,9 @@ class OpenAPIMCPServer {
             // Add any additional properties from OpenAPI spec
           },
         };
+
+        // Store the mapping between name and ID for reverse lookup
+        console.error(`Registering tool: ${toolId} (${tool.name})`);
 
         // Add parameters from operation
         if (op.parameters) {
@@ -179,21 +182,34 @@ class OpenAPIMCPServer {
 
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { id, parameters } = request.params;
+      const { id, name, parameters } = request.params;
       
-      if (!id || typeof id !== 'string' || id.trim() === '') {
-        console.error('Invalid or missing tool ID in request:', request.params);
-        throw new Error('Valid tool ID is required');
+      console.error('Received request:', request.params);
+
+      // Find tool by ID or name
+      let tool: Tool | undefined;
+      let toolId: string | undefined;
+
+      if (id) {
+        toolId = id.trim();
+        tool = this.tools.get(toolId);
+      } else if (name) {
+        // Search for tool by name
+        for (const [tid, t] of this.tools.entries()) {
+          if (t.name === name) {
+            tool = t;
+            toolId = tid;
+            break;
+          }
+        }
       }
 
-      const normalizedId = id.trim();
-      console.error(`Attempting to execute tool: ${normalizedId}`); // Debug logging
-      const tool = this.tools.get(normalizedId);
-
-      if (!tool) {
-        console.error(`Available tools: ${Array.from(this.tools.keys()).join(', ')}`); // Debug logging
-        throw new Error(`Tool not found: ${normalizedId}`);
+      if (!tool || !toolId) {
+        console.error(`Available tools: ${Array.from(this.tools.entries()).map(([id, t]) => `${id} (${t.name})`).join(', ')}`);
+        throw new Error(`Tool not found: ${id || name}`);
       }
+
+      console.error(`Executing tool: ${toolId} (${tool.name})`);
 
       try {
         // Extract method and path from tool ID
