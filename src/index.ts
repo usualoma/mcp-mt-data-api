@@ -102,6 +102,8 @@ class OpenAPIMCPServer {
   }
 
   private initializeHandlers(): void {
+    // change this from resources to mcp tools AI!
+    //
     // Handle resource listing
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       return {
