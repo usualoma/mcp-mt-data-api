@@ -7,9 +7,8 @@ import axios from "axios";
 import { readFile } from "fs/promises";
 import {
   ListToolsRequestSchema,
-  ExecuteToolRequestSchema,
+  CallToolRequestSchema, // Changed from ExecuteToolRequestSchema
   Tool,
-  Result,
 } from "@modelcontextprotocol/sdk/types.js";
 
 interface OpenAPIMCPServerConfig {
@@ -50,6 +49,7 @@ function loadConfigFromEnv(): OpenAPIMCPServerConfig {
 class OpenAPIMCPServer {
   private server: Server;
   private config: OpenAPIMCPServerConfig;
+
   private tools: Map<string, Tool> = new Map();
 
   constructor(config: OpenAPIMCPServerConfig) {
@@ -88,35 +88,38 @@ class OpenAPIMCPServer {
         if (method === "parameters" || !operation) continue;
 
         const op = operation as OpenAPIV3.OperationObject;
-        const toolId = `${method.toUpperCase()}-${path}`.replace(/[^a-zA-Z0-9-]/g, '-');
-        
+        const toolId = `${method.toUpperCase()}-${path}`.replace(
+          /[^a-zA-Z0-9-]/g,
+          "-",
+        );
         const tool: Tool = {
-          id: toolId,
           name: op.summary || `${method.toUpperCase()} ${path}`,
-          description: op.description || `Make a ${method.toUpperCase()} request to ${path}`,
-          parameters: {
+          description:
+            op.description ||
+            `Make a ${method.toUpperCase()} request to ${path}`,
+          inputSchema: {
             type: "object",
             properties: {},
-            required: []
-          }
+            // Add any additional properties from OpenAPI spec
+          },
         };
 
         // Add parameters from operation
         if (op.parameters) {
           for (const param of op.parameters) {
-            if ('name' in param && 'in' in param) {
+            if ("name" in param && "in" in param) {
               const paramSchema = param.schema as OpenAPIV3.SchemaObject;
-              tool.parameters.properties[param.name] = {
-                type: paramSchema.type || 'string',
-                description: param.description || `${param.name} parameter`
+              tool.inputSchema.properties[param.name] = {
+                type: paramSchema.type || "string",
+                description: param.description || `${param.name} parameter`,
               };
               if (param.required) {
-                tool.parameters.required.push(param.name);
+                tool.inputSchema.required = tool.inputSchema.required || [];
+                tool.inputSchema.required.push(param.name);
               }
             }
           }
         }
-
         this.tools.set(toolId, tool);
       }
     }
@@ -131,40 +134,37 @@ class OpenAPIMCPServer {
     });
 
     // Handle tool execution
-    this.server.setRequestHandler(
-      ExecuteToolRequestSchema,
-      async (request) => {
-        const { id, parameters } = request.params;
-        const tool = this.tools.get(id);
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { id, parameters } = request.params;
+      const tool = this.tools.get(id);
 
-        if (!tool) {
-          throw new Error(`Tool not found: ${id}`);
-        }
-
-        try {
-          // Extract method and path from tool ID
-          const [method, ...pathParts] = id.split('-');
-          const path = '/' + pathParts.join('/').replace(/-/g, '/');
-
-          // Make the actual API call
-          const response = await axios({
-            method: method.toLowerCase(),
-            url: `${this.config.apiBaseUrl}${path}`,
-            headers: this.config.headers,
-            params: parameters,
-          });
-
-          return {
-            result: response.data
-          };
-        } catch (error) {
-          if (axios.isAxiosError(error)) {
-            throw new Error(`API request failed: ${error.message}`);
-          }
-          throw error;
-        }
+      if (!tool) {
+        throw new Error(`Tool not found: ${id}`);
       }
-    );
+
+      try {
+        // Extract method and path from tool ID
+        const [method, ...pathParts] = id.split("-");
+        const path = "/" + pathParts.join("/").replace(/-/g, "/");
+
+        // Make the actual API call
+        const response = await axios({
+          method: method.toLowerCase(),
+          url: `${this.config.apiBaseUrl}${path}`,
+          headers: this.config.headers,
+          params: parameters,
+        });
+
+        return {
+          result: response.data,
+        };
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          throw new Error(`API request failed: ${error.message}`);
+        }
+        throw error;
+      }
+    });
   }
 
   async start(): Promise<void> {
