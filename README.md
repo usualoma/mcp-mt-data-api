@@ -4,22 +4,33 @@ A Model Context Protocol (MCP) server that exposes OpenAPI endpoints as MCP reso
 
 ## Quick Start
 
-1. Install dependencies:
-```bash
-npm install
+You do not need to clone this repository to use this MCP server. You can simply configure it in Claude Desktop:
+
+1. Locate or create your Claude Desktop configuration file:
+   - On macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+2. Add the following configuration to enable the OpenAPI MCP server:
+
+```json
+{
+  "mcpServers": {
+    "openapi": {
+      "command": "npx",
+      "args": ["-y", "@ivotoby/openapi-mcp-server"],
+      "env": {
+        "API_BASE_URL": "https://api.example.com",
+        "OPENAPI_SPEC_PATH": "https://api.example.com/openapi.json",
+        "API_HEADERS": "Authorization:Bearer token123,X-API-Key:your-api-key"
+      }
+    }
+  }
+}
 ```
 
-2. Create a `.env` file with your API configuration:
-```env
-API_BASE_URL=https://api.example.com
-OPENAPI_SPEC_PATH=https://api.example.com/openapi.json
-API_HEADERS=Authorization:Bearer token123,X-API-Key:your-api-key
-```
-
-3. Start the server with the inspector:
-```bash
-npm run inspect
-```
+3. Replace the environment variables with your actual API configuration:
+   - `API_BASE_URL`: The base URL of your API
+   - `OPENAPI_SPEC_PATH`: URL or path to your OpenAPI specification
+   - `API_HEADERS`: Comma-separated key:value pairs for API authentication headers
 
 ## Development Tools
 
