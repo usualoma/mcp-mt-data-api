@@ -6,10 +6,10 @@ import { OpenAPIV3 } from "openapi-types";
 import axios from "axios";
 import { readFile } from "fs/promises";
 import {
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  Resource,
-  TextResourceContents,
+  ListToolsRequestSchema,
+  ExecuteToolRequestSchema,
+  Tool,
+  Result,
 } from "@modelcontextprotocol/sdk/types.js";
 
 interface OpenAPIMCPServerConfig {
@@ -50,7 +50,7 @@ function loadConfigFromEnv(): OpenAPIMCPServerConfig {
 class OpenAPIMCPServer {
   private server: Server;
   private config: OpenAPIMCPServerConfig;
-  private resources: Map<string, Resource> = new Map();
+  private tools: Map<string, Tool> = new Map();
 
   constructor(config: OpenAPIMCPServerConfig) {
     this.config = config;
@@ -80,66 +80,82 @@ class OpenAPIMCPServer {
   private async parseOpenAPISpec(): Promise<void> {
     const spec = await this.loadOpenAPISpec();
 
-    // Convert each OpenAPI path to an MCP resource
+    // Convert each OpenAPI path to an MCP tool
     for (const [path, pathItem] of Object.entries(spec.paths)) {
       if (!pathItem) continue;
 
       for (const [method, operation] of Object.entries(pathItem)) {
-        if (method === "parameters" || !operation) continue; // Skip common parameters
+        if (method === "parameters" || !operation) continue;
 
         const op = operation as OpenAPIV3.OperationObject;
-        const resourceUri = `openapi://${path}/${method}`;
-        const resource: Resource = {
-          uri: resourceUri,
+        const toolId = `${method.toUpperCase()}-${path}`.replace(/[^a-zA-Z0-9-]/g, '-');
+        
+        const tool: Tool = {
+          id: toolId,
           name: op.summary || `${method.toUpperCase()} ${path}`,
-          description: op.description,
-          mimeType: "application/json",
+          description: op.description || `Make a ${method.toUpperCase()} request to ${path}`,
+          parameters: {
+            type: "object",
+            properties: {},
+            required: []
+          }
         };
 
-        this.resources.set(resourceUri, resource);
+        // Add parameters from operation
+        if (op.parameters) {
+          for (const param of op.parameters) {
+            if ('name' in param && 'in' in param) {
+              const paramSchema = param.schema as OpenAPIV3.SchemaObject;
+              tool.parameters.properties[param.name] = {
+                type: paramSchema.type || 'string',
+                description: param.description || `${param.name} parameter`
+              };
+              if (param.required) {
+                tool.parameters.required.push(param.name);
+              }
+            }
+          }
+        }
+
+        this.tools.set(toolId, tool);
       }
     }
   }
 
   private initializeHandlers(): void {
-    // Handle resource listing
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    // Handle tool listing
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        resources: Array.from(this.resources.values()),
+        tools: Array.from(this.tools.values()),
       };
     });
 
-    // Handle resource reading
+    // Handle tool execution
     this.server.setRequestHandler(
-      ReadResourceRequestSchema,
+      ExecuteToolRequestSchema,
       async (request) => {
-        const { uri } = request.params;
-        const resource = this.resources.get(uri);
+        const { id, parameters } = request.params;
+        const tool = this.tools.get(id);
 
-        if (!resource) {
-          throw new Error(`Resource not found: ${uri}`);
+        if (!tool) {
+          throw new Error(`Tool not found: ${id}`);
         }
 
-        // Parse the URI to get path and method
-        const [, pathAndMethod] = uri.split("openapi://");
-        const [path, method] = pathAndMethod.split("/");
-
         try {
+          // Extract method and path from tool ID
+          const [method, ...pathParts] = id.split('-');
+          const path = '/' + pathParts.join('/').replace(/-/g, '/');
+
           // Make the actual API call
           const response = await axios({
-            method,
+            method: method.toLowerCase(),
             url: `${this.config.apiBaseUrl}${path}`,
             headers: this.config.headers,
+            params: parameters,
           });
 
-          const contents: TextResourceContents = {
-            uri,
-            mimeType: "application/json",
-            text: JSON.stringify(response.data, null, 2),
-          };
-
           return {
-            contents: [contents],
+            result: response.data
           };
         } catch (error) {
           if (axios.isAxiosError(error)) {
@@ -147,7 +163,7 @@ class OpenAPIMCPServer {
           }
           throw error;
         }
-      },
+      }
     );
   }
 
