@@ -231,7 +231,7 @@ class OpenAPIMCPServer {
         console.error(`Making API request: ${method.toLowerCase()} ${url}`);
         console.error(`Base URL: ${baseUrl}`);
         console.error(`Path: ${cleanPath}`);
-        console.error(`Raw parameters:`, parameters);
+        console.error(`Raw parameters:`, params);
         console.error(`Request headers:`, this.config.headers);
 
         // Prepare request configuration
