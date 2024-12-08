@@ -278,7 +278,9 @@ class OpenAPIMCPServer {
           console.error("Response headers:", response.headers);
           console.error("Response data:", response.data);
           return {
-            result: response.data,
+            content: [{
+              text: JSON.stringify(response.data, null, 2)
+            }]
           };
         } catch (error) {
           if (axios.isAxiosError(error)) {
@@ -295,9 +297,6 @@ class OpenAPIMCPServer {
           throw error;
         }
 
-        return {
-          result: response.data,
-        };
       } catch (error) {
         if (axios.isAxiosError(error)) {
           throw new Error(`API request failed: ${error.message}`);
