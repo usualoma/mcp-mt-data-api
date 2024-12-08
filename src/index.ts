@@ -230,7 +230,7 @@ class OpenAPIMCPServer {
         console.error(`Making API request: ${method.toLowerCase()} ${url}`);
         console.error(`Base URL: ${baseUrl}`);
         console.error(`Path: ${cleanPath}`);
-        console.error(`Request parameters:`, parameters);
+        console.error(`Raw parameters:`, parameters);
         console.error(`Request headers:`, this.config.headers);
 
         // Prepare request configuration
@@ -242,11 +242,27 @@ class OpenAPIMCPServer {
 
         // Handle different parameter types based on HTTP method
         if (method.toLowerCase() === 'get') {
-          config.params = parameters;
+          // For GET requests, ensure parameters are properly structured
+          if (parameters && typeof parameters === 'object') {
+            // Handle array parameters properly
+            const params: Record<string, string> = {};
+            for (const [key, value] of Object.entries(parameters)) {
+              if (Array.isArray(value)) {
+                // Join array values with commas for query params
+                params[key] = value.join(',');
+              } else if (value !== undefined && value !== null) {
+                // Convert other values to strings
+                params[key] = String(value);
+              }
+            }
+            config.params = params;
+          }
         } else {
           // For POST, PUT, PATCH - send as body
           config.data = parameters;
         }
+
+        console.error(`Processed parameters:`, config.params || config.data);
 
         console.error('Final request config:', config);
 
