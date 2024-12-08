@@ -129,10 +129,13 @@ class OpenAPIMCPServer {
         if (method === "parameters" || !operation) continue;
 
         const op = operation as OpenAPIV3.OperationObject;
-        const toolId = `${method.toUpperCase()}-${path}`.replace(
+        // Create a clean tool ID by removing the leading slash and replacing special chars
+        const cleanPath = path.replace(/^\//, '');
+        const toolId = `${method.toUpperCase()}-${cleanPath}`.replace(
           /[^a-zA-Z0-9-]/g,
           "-",
         );
+        console.error(`Registering tool: ${toolId}`); // Debug logging
         const tool: Tool = {
           name: op.summary || `${method.toUpperCase()} ${path}`,
           description:
@@ -177,9 +180,16 @@ class OpenAPIMCPServer {
     // Handle tool execution
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { id, parameters } = request.params;
+      
+      if (!id) {
+        throw new Error('Tool ID is required');
+      }
+
+      console.error(`Attempting to execute tool: ${id}`); // Debug logging
       const tool = this.tools.get(id);
 
       if (!tool) {
+        console.error(`Available tools: ${Array.from(this.tools.keys()).join(', ')}`); // Debug logging
         throw new Error(`Tool not found: ${id}`);
       }
 
