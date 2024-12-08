@@ -1,51 +1,51 @@
-import { OpenAPIMCPServer } from './openapi-mcp-server';
-import { OpenAPIV3 } from 'openapi-types';
+import { OpenAPIMCPServer } from "./openapi-mcp-server";
+import { OpenAPIV3 } from "openapi-types";
 
 // Example OpenAPI spec
 const openApiSpec: OpenAPIV3.Document = {
-  openapi: '3.0.0',
+  openapi: "3.0.0",
   info: {
-    title: 'Example API',
-    version: '1.0.0'
+    title: "Example API",
+    version: "1.0.0",
   },
   paths: {
-    '/users': {
+    "/users": {
       get: {
-        summary: 'List users',
-        description: 'Returns a list of users',
+        summary: "List users",
+        description: "Returns a list of users",
         responses: {
-          '200': {
-            description: 'Successful response',
+          "200": {
+            description: "Successful response",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'array',
+                  type: "array",
                   items: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      id: { type: 'string' },
-                      name: { type: 'string' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+                      id: { type: "string" },
+                      name: { type: "string" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
 };
 
 async function main() {
   const server = new OpenAPIMCPServer({
-    name: 'openapi-mcp-server',
-    version: '1.0.0',
-    apiBaseUrl: 'https://api.example.com',
+    name: "openapi-mcp-server",
+    version: "1.0.0",
+    apiBaseUrl: "https://api.example.com",
     openApiSpec,
     headers: {
-      'Authorization': 'Bearer your-token'
-    }
+      Authorization: "Bearer your-token",
+    },
   });
 
   await server.start();

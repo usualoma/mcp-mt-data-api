@@ -2,14 +2,26 @@
   "name": "openapi-mcp-server",
   "version": "1.0.0",
   "description": "An MCP server that exposes OpenAPI endpoints as resources",
-  "main": "dist/index.js",
+  "license": "MIT",
   "type": "module",
+  "main": "./dist/bundle.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com:ivo-toby/contentful-mcp.git"
+  },
+  "bin": {
+    "mcp-server-contentful": "./bin/mcp-server.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsc && node build.js",
-    "watch": "tsc -w",
+    "build": "node build.js && chmod +x bin/mcp-server.js",
+    "clean": "rm -rf dist",
     "lint": "eslint src/**/*.ts",
-    "test": "jest",
-    "clean": "rm -rf dist"
+    "watch": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.4.0",

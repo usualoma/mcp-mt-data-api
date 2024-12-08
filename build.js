@@ -1,11 +1,12 @@
-import * as esbuild from 'esbuild';
-
+import * as esbuild from "esbuild";
 await esbuild.build({
-  entryPoints: ['./dist/src/index.js'],
+  entryPoints: ["./src/index.ts"],
   bundle: true,
-  platform: 'node',
-  target: 'node20',
-  format: 'esm',
-  outfile: 'dist/bundle.js',
-  external: [], // Bundle everything
+  platform: "node",
+  format: "esm",
+  outfile: "./dist/bundle.js",
+  target: "node18",
+  banner: {
+    js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);`,
+  },
 });
