@@ -216,12 +216,23 @@ class OpenAPIMCPServer {
         const [method, ...pathParts] = toolId.split("-");
         const path = "/" + pathParts.join("/").replace(/-/g, "/");
 
-        // Make the actual API call
-        const url = new URL(path, this.config.apiBaseUrl).toString();
-        console.error(`Making API request: ${method.toLowerCase()} ${url}`); // Debug logging
+        // Ensure base URL ends with slash for proper joining
+        const baseUrl = this.config.apiBaseUrl.endsWith('/') 
+          ? this.config.apiBaseUrl 
+          : `${this.config.apiBaseUrl}/`;
+        
+        // Remove leading slash from path to avoid double slashes
+        const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+        
+        // Construct the full URL
+        const url = new URL(cleanPath, baseUrl).toString();
+        
+        console.error(`Making API request: ${method.toLowerCase()} ${url}`);
+        console.error(`Base URL: ${baseUrl}`);
+        console.error(`Path: ${cleanPath}`);
         console.error(`Request parameters:`, parameters);
         console.error(`Request headers:`, this.config.headers);
-        
+
         const response = await axios({
           method: method.toLowerCase(),
           url: url,
