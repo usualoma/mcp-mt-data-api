@@ -217,10 +217,14 @@ class OpenAPIMCPServer {
         const path = "/" + pathParts.join("/").replace(/-/g, "/");
 
         // Make the actual API call
-        console.error(`Making API request: ${method.toLowerCase()} ${path}`); // Debug logging
+        const url = new URL(path, this.config.apiBaseUrl).toString();
+        console.error(`Making API request: ${method.toLowerCase()} ${url}`); // Debug logging
+        console.error(`Request parameters:`, parameters);
+        console.error(`Request headers:`, this.config.headers);
+        
         const response = await axios({
           method: method.toLowerCase(),
-          url: `${this.config.apiBaseUrl}${path}`,
+          url: url,
           headers: this.config.headers,
           params: parameters,
         });
