@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { OpenAPIV3 } from "openapi-types";
@@ -15,11 +16,38 @@ interface OpenAPIMCPServerConfig {
   name: string;
   version: string;
   apiBaseUrl: string;
-  openApiSpec: OpenAPIV3.Document | string; // Can be either a Document object or a path/URL
+  openApiSpec: OpenAPIV3.Document | string;
   headers?: Record<string, string>;
 }
 
-export class OpenAPIMCPServer {
+function loadConfigFromEnv(): OpenAPIMCPServerConfig {
+  if (!process.env.API_BASE_URL) {
+    throw new Error("API_BASE_URL environment variable is required");
+  }
+  if (!process.env.OPENAPI_SPEC_PATH) {
+    throw new Error("OPENAPI_SPEC_PATH environment variable is required");
+  }
+
+  // Parse headers from env if present
+  // Format: "key1:value1,key2:value2"
+  const headers: Record<string, string> = {};
+  if (process.env.API_HEADERS) {
+    process.env.API_HEADERS.split(",").forEach((header) => {
+      const [key, value] = header.split(":");
+      if (key && value) headers[key.trim()] = value.trim();
+    });
+  }
+
+  return {
+    name: process.env.SERVER_NAME || "mcp-openapi-server",
+    version: process.env.SERVER_VERSION || "1.0.0",
+    apiBaseUrl: process.env.API_BASE_URL,
+    openApiSpec: process.env.OPENAPI_SPEC_PATH,
+    headers,
+  };
+}
+
+class OpenAPIMCPServer {
   private server: Server;
   private config: OpenAPIMCPServerConfig;
   private resources: Map<string, Resource> = new Map();
@@ -127,5 +155,21 @@ export class OpenAPIMCPServer {
     await this.parseOpenAPISpec();
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
+    console.error("OpenAPI MCP Server running on stdio");
   }
 }
+
+async function main(): Promise<void> {
+  try {
+    const config = loadConfigFromEnv();
+    const server = new OpenAPIMCPServer(config);
+    await server.start();
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+main();
+
+export { OpenAPIMCPServer, loadConfigFromEnv };
