@@ -1,169 +1,103 @@
-# THIS IS A WORK IN PROGRESS!
-
 # OpenAPI MCP Server
 
-A Model Context Protocol (MCP) server that exposes OpenAPI endpoints as MCP resources. This server allows MCP clients to discover and interact with REST APIs defined by OpenAPI specifications.
+A Model Context Protocol (MCP) server that exposes OpenAPI endpoints as MCP resources. This server allows Large Language Models to discover and interact with REST APIs defined by OpenAPI specifications through the MCP protocol.
 
-## Features
+## Quick Start
 
-- Load OpenAPI specifications from:
-  - Local JSON files
-  - Remote URLs
-  - Direct specification objects
-- Automatic conversion of OpenAPI endpoints to MCP resources
-- Support for custom HTTP headers
-- Built on the official MCP SDK
-
-## Installation
-
+1. Install dependencies:
 ```bash
-npm install openapi-mcp-server
-```
-
-## Usage
-
-### Basic Example
-
-```typescript
-import { OpenAPIMCPServer } from "openapi-mcp-server";
-
-const server = new OpenAPIMCPServer({
-  name: "petstore-mcp",
-  version: "1.0.0",
-  apiBaseUrl: "https://petstore.swagger.io/v2",
-  openApiSpec: "https://petstore.swagger.io/v2/swagger.json",
-});
-
-await server.start();
-```
-
-### Cat Facts Example
-
-The repository includes an example implementation using the Cat Facts API:
-
-```typescript
-import { OpenAPIMCPServer } from "openapi-mcp-server";
-
-const server = new OpenAPIMCPServer({
-  name: "cat-facts-mcp",
-  version: "1.0.0",
-  apiBaseUrl: "https://catfact.ninja",
-  openApiSpec: catFactsSpec, // OpenAPI specification object
-});
-
-await server.start();
-```
-
-This example demonstrates:
-
-- Creating an inline OpenAPI specification
-- Initializing an OpenAPIMCPServer
-- Exposing Cat Facts API endpoints as MCP resources
-- Basic error handling
-
-To run the example:
-
-```bash
-npm run build
-node dist/examples/cat-facts.js
-```
-
-### Configuration Options
-
-The server accepts the following configuration:
-
-```typescript
-interface OpenAPIMCPServerConfig {
-  // Name of your MCP server
-  name: string;
-
-  // Version of your MCP server
-  version: string;
-
-  // Base URL for the API endpoints
-  apiBaseUrl: string;
-
-  // OpenAPI specification - can be:
-  // - A path to a local JSON file
-  // - A URL to a remote specification
-  // - An OpenAPI Document object
-  openApiSpec: OpenAPIV3.Document | string;
-
-  // Optional HTTP headers to include with API requests
-  headers?: Record<string, string>;
-}
-```
-
-### Loading Specifications
-
-You can load the OpenAPI specification in multiple ways:
-
-```typescript
-// From a local file
-const localServer = new OpenAPIMCPServer({
-  ...config,
-  openApiSpec: "./specs/api.json",
-});
-
-// From a URL
-const remoteServer = new OpenAPIMCPServer({
-  ...config,
-  openApiSpec: "https://api.example.com/openapi.json",
-});
-
-// Direct specification object
-const directServer = new OpenAPIMCPServer({
-  ...config,
-  openApiSpec: {
-    openapi: "3.0.0",
-    // ... rest of OpenAPI spec
-  },
-});
-```
-
-### Adding Custom Headers
-
-You can include custom headers for API requests:
-
-```typescript
-const server = new OpenAPIMCPServer({
-  ...config,
-  headers: {
-    Authorization: "Bearer token123",
-    "X-API-Key": "your-api-key",
-  },
-});
-```
-
-## Resource URIs
-
-The server creates MCP resources for each OpenAPI endpoint using the following URI format:
-
-```
-openapi://{path}/{method}
-```
-
-For example, an endpoint `GET /pets/{id}` becomes:
-
-```
-openapi:///pets/{id}/get
-```
-
-## Development
-
-```bash
-# Install dependencies
 npm install
-
-# Build the project
-npm run build
-
-# Run tests
-npm test
-
-# Run linter
-npm run lint
 ```
+
+2. Create a `.env` file with your API configuration:
+```env
+API_BASE_URL=https://api.example.com
+OPENAPI_SPEC_PATH=https://api.example.com/openapi.json
+API_HEADERS=Authorization:Bearer token123,X-API-Key:your-api-key
+```
+
+3. Start the server with the inspector:
+```bash
+npm run inspect
+```
+
+## Development Tools
+
+This project includes several development tools to make your workflow easier:
+
+### Building
+
+- `npm run build` - Builds the TypeScript source
+- `npm run clean` - Removes build artifacts
+- `npm run typecheck` - Runs TypeScript type checking
+
+### Development Mode
+
+- `npm run dev` - Watches source files and rebuilds on changes
+- `npm run inspect-watch` - Runs the inspector with auto-reload on changes
+
+### Code Quality
+
+- `npm run lint` - Runs ESLint
+- `npm run typecheck` - Verifies TypeScript types
+
+## Configuration
+
+The server can be configured through environment variables or command line arguments:
+
+### Environment Variables
+
+- `API_BASE_URL` - Base URL for the API endpoints
+- `OPENAPI_SPEC_PATH` - Path or URL to OpenAPI specification
+- `API_HEADERS` - Comma-separated key:value pairs for API headers
+- `SERVER_NAME` - Name for the MCP server (default: "mcp-openapi-server")
+- `SERVER_VERSION` - Version of the server (default: "1.0.0")
+
+### Command Line Arguments
+
+```bash
+npm run inspect -- \
+  --api-base-url https://api.example.com \
+  --openapi-spec https://api.example.com/openapi.json \
+  --headers "Authorization:Bearer token123,X-API-Key:your-api-key" \
+  --name "my-mcp-server" \
+  --version "1.0.0"
+```
+
+## Development Workflow
+
+1. Start the development environment:
+```bash
+npm run inspect-watch
+```
+
+2. Make changes to the TypeScript files in `src/`
+3. The server will automatically rebuild and restart
+4. Use the MCP Inspector UI to test your changes
+
+## Debugging
+
+The server outputs debug logs to stderr. To see these logs:
+
+1. In development mode:
+   - Logs appear in the terminal running `inspect-watch`
+   
+2. When running directly:
+   ```bash
+   npm run inspect 2>debug.log
+   ```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting:
+   ```bash
+   npm run typecheck
+   npm run lint
+   ```
+5. Submit a pull request
 
 ## License
 
