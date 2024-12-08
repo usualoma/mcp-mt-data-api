@@ -233,12 +233,43 @@ class OpenAPIMCPServer {
         console.error(`Request parameters:`, parameters);
         console.error(`Request headers:`, this.config.headers);
 
-        const response = await axios({
+        // Prepare request configuration
+        const config: any = {
           method: method.toLowerCase(),
           url: url,
           headers: this.config.headers,
-          params: parameters,
-        });
+        };
+
+        // Handle different parameter types based on HTTP method
+        if (method.toLowerCase() === 'get') {
+          config.params = parameters;
+        } else {
+          // For POST, PUT, PATCH - send as body
+          config.data = parameters;
+        }
+
+        console.error('Final request config:', config);
+
+        try {
+          const response = await axios(config);
+          console.error('Response status:', response.status);
+          console.error('Response headers:', response.headers);
+          console.error('Response data:', response.data);
+          return {
+            result: response.data,
+          };
+        } catch (error) {
+          if (axios.isAxiosError(error)) {
+            console.error('Request failed:', {
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              data: error.response?.data,
+              headers: error.response?.headers,
+            });
+            throw new Error(`API request failed: ${error.message} - ${JSON.stringify(error.response?.data)}`);
+          }
+          throw error;
+        }
 
         return {
           result: response.data,
