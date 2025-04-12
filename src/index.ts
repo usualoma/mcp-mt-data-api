@@ -12,6 +12,7 @@ import {
   CallToolRequestSchema, // Changed from ExecuteToolRequestSchema
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import { getConfigFromBrowser } from "./browser";
 
 interface OpenAPIMCPServerConfig {
   name: string;
@@ -19,6 +20,9 @@ interface OpenAPIMCPServerConfig {
   apiBaseUrl: string;
   openApiSpec: OpenAPIV3.Document | string;
   headers?: Record<string, string>;
+  username?: string;
+  password?: string;
+  token?: any;
 }
 
 function parseHeaders(headerStr?: string): Record<string, string> {
@@ -32,7 +36,7 @@ function parseHeaders(headerStr?: string): Record<string, string> {
   return headers;
 }
 
-function loadConfig(): OpenAPIMCPServerConfig {
+async function loadConfig(): Promise<OpenAPIMCPServerConfig> {
   const argv = yargs(hideBin(process.argv))
     .option("api-base-url", {
       alias: "u",
@@ -59,20 +63,30 @@ function loadConfig(): OpenAPIMCPServerConfig {
       type: "string",
       description: "Server version",
     })
+    .option("username", {
+      type: "string",
+      description: "Username for API authentication",
+    })
+    .option("password", {
+      type: "string",
+      description: "Password for API authentication",
+    })
     .help().argv;
 
   // Combine CLI args and env vars, with CLI taking precedence
-  const apiBaseUrl = argv["api-base-url"] || process.env.API_BASE_URL;
-  const openApiSpec = argv["openapi-spec"] || process.env.OPENAPI_SPEC_PATH;
-
+  let apiBaseUrl = argv["api-base-url"] || process.env.API_BASE_URL;
   if (!apiBaseUrl) {
-    throw new Error(
-      "API base URL is required (--api-base-url or API_BASE_URL)",
-    );
+    const config = await getConfigFromBrowser();
+    Object.assign(argv, config);
+    apiBaseUrl = argv["api-base-url"];
   }
+
+  const openApiSpec =
+    argv["openapi-spec"] || process.env.OPENAPI_SPEC_PATH || apiBaseUrl;
+
   if (!openApiSpec) {
     throw new Error(
-      "OpenAPI spec is required (--openapi-spec or OPENAPI_SPEC_PATH)",
+      "OpenAPI spec is required (--openapi-spec or OPENAPI_SPEC_PATH)"
     );
   }
 
@@ -84,6 +98,8 @@ function loadConfig(): OpenAPIMCPServerConfig {
     apiBaseUrl,
     openApiSpec,
     headers,
+    username: argv.username || process.env.API_USERNAME,
+    password: argv.password || process.env.API_PASSWORD,
   };
 }
 
@@ -127,26 +143,35 @@ class OpenAPIMCPServer {
 
       for (const [method, operation] of Object.entries(pathItem)) {
         if (method === "parameters" || !operation) continue;
+        // if (method.toUpperCase() !== "GET") continue;
 
         const op = operation as OpenAPIV3.OperationObject;
         // Create a clean tool ID by removing the leading slash and replacing special chars
-        const cleanPath = path.replace(/^\//, "");
+        const cleanPath = path
+          .replace(/^\//, "")
+          .replace(/{([^}]+)}$/g, (_, name) => {
+            return name;
+          })
+          .replace(/\/{[^}]+}/g, "");
         const toolId = `${method.toUpperCase()}-${cleanPath}`.replace(
           /[^a-zA-Z0-9-]/g,
-          "-",
+          "-"
         );
+
+        if (toolId.includes("auth")) continue;
+        if (toolId.includes("token")) continue;
+
         console.error(`Registering tool: ${toolId}`); // Debug logging
         const tool: Tool = {
-          name:
-            op.operationId || op.summary || `${method.toUpperCase()} ${path}`,
+          name: toolId.toLowerCase(),
           description:
-            op.description ||
-            `Make a ${method.toUpperCase()} request to ${path}`,
+            op.summary || `Make a ${method.toUpperCase()} request to ${path}`,
           inputSchema: {
             type: "object",
             properties: {},
             // Add any additional properties from OpenAPI spec
           },
+          path,
         };
 
         // Store the mapping between name and ID for reverse lookup
@@ -167,6 +192,22 @@ class OpenAPIMCPServer {
               }
             }
           }
+        }
+        if (op.requestBody?.content?.["application/x-www-form-urlencoded"]?.schema?.properties) {
+          for (const [key, value] of Object.entries(op.requestBody.content["application/x-www-form-urlencoded"].schema.properties)) {
+            if (value.$ref) {
+              const ref = spec.components?.schemas?.[value.$ref.replace(/.*\//, "")];
+              if (ref) {
+                tool.inputSchema.properties[key] = {
+                  type: ref.type || "string",
+                  description: ref.description || `${key} parameter`,
+                  properties: ref.properties,
+                };
+              }
+            }
+          }
+
+          // console.dir(tool.inputSchema)
         }
         this.tools.set(toolId, tool);
       }
@@ -210,7 +251,7 @@ class OpenAPIMCPServer {
         console.error(
           `Available tools: ${Array.from(this.tools.entries())
             .map(([id, t]) => `${id} (${t.name})`)
-            .join(", ")}`,
+            .join(", ")}`
         );
         throw new Error(`Tool not found: ${id || name}`);
       }
@@ -220,7 +261,52 @@ class OpenAPIMCPServer {
       try {
         // Extract method and path from tool ID
         const [method, ...pathParts] = toolId.split("-");
-        const path = "/" + pathParts.join("/").replace(/-/g, "/");
+        const path = tool.path.replace(/{([^}]+)}/g, (_, name) => {
+          return params?.[name] || "";
+        });
+
+        const headers = { ...this.config.headers };
+        if (this.config.username && this.config.password) {
+          if (this.config.token) {
+            if (
+              this.config.token.expiresAt &&
+              this.config.token.expiresAt < Date.now() - 1000 * 10
+            ) {
+              const response = await axios.post(
+                `${this.config.apiBaseUrl}/token`,
+                {},
+                {
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-MT-Authorization": `MTAuth sessionId=${this.config.token.sessionId}`,
+                  },
+                }
+              );
+              this.config.token.accessToken = response.data.accessToken;
+            }
+          } else {
+            const response = await axios.post(
+              `${this.config.apiBaseUrl}/authentication`,
+              {
+                clientId: "mcp-mt-data-api",
+                username: this.config.username,
+                password: this.config.password,
+              },
+              {
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+              }
+            );
+            this.config.token = response.data;
+            this.config.token.expiresAt = new Date(
+              Date.now() + this.config.token.expiresIn * 1000
+            );
+          }
+          headers[
+            "X-MT-Authorization"
+          ] = `MTAuth accessToken=${this.config.token.accessToken}`;
+        }
 
         // Ensure base URL ends with slash for proper joining
         const baseUrl = this.config.apiBaseUrl.endsWith("/")
@@ -241,9 +327,9 @@ class OpenAPIMCPServer {
 
         // Prepare request configuration
         const config: any = {
-          method: method.toLowerCase(),
+          method: method.toUpperCase(),
           url: url,
-          headers: this.config.headers,
+          headers,
         };
 
         // Handle different parameter types based on HTTP method
@@ -265,7 +351,25 @@ class OpenAPIMCPServer {
           }
         } else {
           // For POST, PUT, PATCH - send as body
-          config.data = params;
+          // config.data = params;
+
+          // send via form-data
+          config.headers["Content-Type"] = "multipart/form-data";
+          config.data = new FormData();
+          for (const [key, value] of Object.entries(params)) {
+            if (Array.isArray(value)) {
+              for (const v of value) {
+                config.data.append(key, v);
+              }
+            } else if (typeof value === "object" && value !== null) {
+              config.data.append(key, JSON.stringify(value));
+            } else {
+              config.data.append(key, value);
+            }
+          }
+
+          config.data.append("__method", method.toUpperCase());
+          config.method = "POST";
         }
 
         console.error(`Processed parameters:`, config.params || config.data);
@@ -278,10 +382,12 @@ class OpenAPIMCPServer {
           console.error("Response headers:", response.headers);
           console.error("Response data:", response.data);
           return {
-            content: [{
-              type: "text",
-              text: JSON.stringify(response.data, null, 2)
-            }]
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(response.data, null, 2),
+              },
+            ],
           };
         } catch (error) {
           if (axios.isAxiosError(error)) {
@@ -292,12 +398,13 @@ class OpenAPIMCPServer {
               headers: error.response?.headers,
             });
             throw new Error(
-              `API request failed: ${error.message} - ${JSON.stringify(error.response?.data)}`,
+              `API request failed: ${error.message} - ${JSON.stringify(
+                error.response?.data
+              )}`
             );
           }
           throw error;
         }
-
       } catch (error) {
         if (axios.isAxiosError(error)) {
           throw new Error(`API request failed: ${error.message}`);
@@ -317,7 +424,7 @@ class OpenAPIMCPServer {
 
 async function main(): Promise<void> {
   try {
-    const config = loadConfig();
+    const config = await loadConfig();
     const server = new OpenAPIMCPServer(config);
     await server.start();
   } catch (error) {
